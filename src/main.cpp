@@ -92,7 +92,7 @@ int main(int argc, char ** argv) {
         ("s,fontsize", "Fontsize multiplier", cxxopts::value<uint8_t>()->default_value("2"))
         ("d,debug", "Enable debug", cxxopts::value<bool>()->default_value("false"))
         ("c,shell", "Shell (full path)", cxxopts::value<std::string>()->default_value("/bin/sh"))
-        ("i,input", "Initial stdin line (eg, call init script)", cxxopts::value<std::string>()->default_value(""))
+        ("i,input", "Initial stdin line (e.g., call init script)", cxxopts::value<std::string>()->default_value(""))
     ;
     auto arg_result = arg_options.parse(argc, argv);
     if (arg_result.count("help")) {
