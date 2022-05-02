@@ -23,3 +23,5 @@ InkVT-*.zip
 peda-session-dash.txt
 deploy.sh
 koboroot/.adds/inkvt/update.sh
+libvterm/.bzr
+libvterm/.bzrignore
