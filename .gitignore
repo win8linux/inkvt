@@ -25,3 +25,5 @@ deploy.sh
 koboroot/.adds/inkvt/update.sh
 libvterm/.bzr
 libvterm/.bzrignore
+libvterm/src/*.o
+libvterm/src/encoding/*.inc
