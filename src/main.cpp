@@ -196,13 +196,13 @@ int main(int argc, char ** argv) {
 
                 // And the various extra device-specific quirks on top of that...
                 // c.f., https://github.com/koreader/koreader/blob/master/frontend/device/kobo/device.lua
-                if (vterm.state.device_id == 310u || vterm.state.device_id == 320u) {
+                if (vterm.state.device_id == DEVICE_KOBO_TOUCH_AB || vterm.state.device_id == DEVICE_KOBO_TOUCH_C) {
                     // Touch A/B & Touch C. This will most likely be wrong for one of those.
                     // touch_mirrored_x
                     x = dim_swap - inputs.istate.x;
                     y = inputs.istate.y;
-                } else if (vterm.state.device_id == 374u) {
-                    // Aura H2O²r1
+                } else if (vterm.state.device_id == DEVICE_KOBO_AURA_H2O_2 || vterm.state.device_id == DEVICE_KOBO_LIBRA_2) {
+                    // Aura H2O²r1 & Libra 2
                     // touch_switch_xy
                     x = inputs.istate.y;
                     y = inputs.istate.x;
