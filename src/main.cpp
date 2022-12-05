@@ -172,12 +172,9 @@ int main(int argc, char ** argv) {
             }
         }
         if (vterm.has_osk) {
-            if (inputs.istate.xev && inputs.istate.yev) {
-                inputs.istate.xev = 0;
-                inputs.istate.yev = 0;
-                inputs.istate.moved = 0;
-                int x;
-                int y;
+            if (inputs.istate.state == UP) {
+                int32_t x;
+                int32_t y;
 #ifdef TARGET_KOBO
                 // On Kobo, the touch panel has a fixed rotation, one that *never* matches the actual rotation.
                 // Handle the initial translation here so that it makes sense @ (canonical) UR...
@@ -185,7 +182,7 @@ int main(int argc, char ** argv) {
                 // c.f., rotate_touch_coordinates in FBInk for a different, possibly less compatible approach...
 
                 // Speaking of, handle said layout shenanigans now...
-                int dim_swap;
+                int32_t dim_swap;
                 if ((fbink_rota_native_to_canonical(vterm.state.current_rota) & 1u) == 0u) {
                     // Canonical rotation is even (UR/UD)
                     dim_swap = vterm.state.screen_width;
@@ -196,10 +193,11 @@ int main(int argc, char ** argv) {
 
                 // And the various extra device-specific quirks on top of that...
                 // c.f., https://github.com/koreader/koreader/blob/master/frontend/device/kobo/device.lua
-                if (vterm.state.device_id == DEVICE_KOBO_TOUCH_AB || vterm.state.device_id == DEVICE_KOBO_TOUCH_C) {
-                    // Touch A/B & Touch C. This will most likely be wrong for one of those.
-                    // touch_mirrored_x
-                    x = dim_swap - inputs.istate.x;
+                if (vterm.state.device_id == DEVICE_KOBO_TOUCH_B) {
+                    // The Touch B does something... weird.
+                    // The frame that reports a contact lift does the coordinates transform for us...
+                    // That makes this a NOP for this frame only...
+                    x = inputs.istate.x;
                     y = inputs.istate.y;
                 } else if (vterm.state.device_id == DEVICE_KOBO_AURA_H2O_2 || vterm.state.device_id == DEVICE_KOBO_LIBRA_2) {
                     // Aura H2O²r1 & Libra 2

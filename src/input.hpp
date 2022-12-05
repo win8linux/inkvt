@@ -51,11 +51,12 @@ public:
     bool had_input = 0;
 
     struct {
-        int x = 0;
-        int y = 0;
-        int xev = 0;
-        int yev = 0;
-        int moved = 0;
+        int32_t x = 0;
+        int32_t y = 0;
+        int32_t prev_x = 0;
+        int32_t prev_y = 0;
+        contact_tool tool = UNKNOWN_TOOL;
+        contact_state state = UNKNOWN_STATE;
     } istate;
 private:
     enum fdtype {
@@ -68,6 +69,16 @@ private:
         FD_VTERM_TIMER,
         FD_TIMER_NO_INPUT,
     };
+    enum contact_tool {
+        UNKNOWN_TOOL,
+        FINGER,
+        PEN,
+    };
+    enum contact_state {
+        UNKNOWN_STATE,
+        DOWN,
+        UP,
+    };
     fdtype fdtype[128];
     struct pollfd fds[128];
     int nfds = 0;
@@ -75,42 +86,104 @@ private:
     struct termios termios_reset = {};
     VTermToFBInk * vterm = 0;
 
-    void handle_evdev(Buffers & buffers, struct input_event ev) {
-        int handled = 1;
-        if (ev.type == EV_ABS) {
-            if (ev.code == ABS_MT_POSITION_X || ev.code == ABS_X) {
-                if (ev.value != istate.x) istate.moved += 1;
-                istate.x = ev.value;
-                istate.xev = 1;
-                handled = 1;
-            } else if (ev.code == ABS_MT_POSITION_Y || ev.code == ABS_Y) {
-                if (ev.value != istate.y) istate.moved += 1;
-                istate.y = ev.value;
-                istate.yev = 1;
-                handled = 1;
+    bool handle_evdev(Buffers & buffers, struct input_event & ev) {
+        // NOTE: Lifted from https://github.com/NiLuJe/FBInk/blob/master/utils/finger_trace.c
+        // NOTE: Shitty minimal state machinesque: we don't handle slots, gestures, or whatever ;).
+        if (ev->type == EV_SYN && ev->code == SYN_REPORT) {
+            // We only do stuff on each REPORT,
+            // iff the finger actually moved somewhat significantly...
+            // NOTE: Should ideally be clamped to between 0 and the relevant screen dimension ;).
+            if ((touch->pos.x > prev_touch->pos.x + 2 ||
+                touch->pos.x < prev_touch->pos.x - 2) ||
+                (touch->pos.y > prev_touch->pos.y + 2 ||
+                touch->pos.y < prev_touch->pos.y - 2)) {
+                    istate.prev_x = istate.x;
+                    istate.prev_y = istate.y;
             }
-        } else if(false && ev.type == EV_KEY) { // maybe I should just remove old evdev keyboard handling
-            if (ev.value == 1 || ev.value == 2) {
-                buffers.scancodes.push_back(ev.code | 0x100);
-                handled = 1;
-            } else if(ev.value == 0) {
-                buffers.scancodes.push_back(ev.code | 0);
-                handled = 1;
+
+            // Keep draining the queue without going back to poll
+            return true;
+        }
+
+        // Detect tool type & all contacts up on Mk. 7 (and possibly earlier "snow" protocol devices).
+        if (ev->type == EV_KEY) {
+            switch (ev->code) {
+                case BTN_TOOL_PEN:
+                    istate.tool = PEN;
+                    // To detect up/down state on "snow" protocol without weird slot shenanigans...
+                    // It's out-of-band of MT events, so, it unfortunately means *all* contacts,
+                    // not a specific slot...
+                    // (i.e., you won't get an EV_KEY:BTN_TOUCH:0 until *all* contact points have been lifted).
+                    if (ev->value > 0) {
+                            istate.state = DOWN;
+                    } else {
+                            istate.state = UP;
+                    }
+                    break;
+                case BTN_TOOL_FINGER:
+                    istate.tool = FINGER;
+                    if (ev->value > 0) {
+                            istate.state = DOWN;
+                    } else {
+                            istate.state = UP;
+                    }
+                    break;
             }
         }
-        if (!handled) {
-            printf("EVENT: %d %d %d\n", ev.type, ev.code, ev.value);
+
+        if (ev->type == EV_ABS) {
+            switch (ev->code) {
+                case ABS_MT_TOOL_TYPE:
+                    // Detect tool type on Mk. 8
+                    if (ev->value == 0) {
+                            istate.tool = FINGER;
+                    } else if (ev->value == 1) {
+                            istate.tool = PEN;
+                    }
+                    break;
+                // NOTE: That should cover everything...
+                //       Mk. 6+ reports EV_KEY:BTN_TOUCH events,
+                //       which would be easier to deal with,
+                //       but redundant here ;).
+                // NOTE: When in doubt about what a simple event stream looks like on specific devices,
+                //       check generate_button_press @ fbink_button_scan.c ;).
+                case ABS_PRESSURE:
+                case ABS_MT_WIDTH_MAJOR:
+                //case ABS_MT_TOUCH_MAJOR: // Oops, not that one, it's always 0 on early Mk.7 devices :s
+                case ABS_MT_PRESSURE:
+                    if (ev->value > 0) {
+                            istate.state = DOWN;
+                    } else {
+                            istate.state = UP;
+                    }
+                    break;
+                case ABS_X:
+                case ABS_MT_POSITION_X:
+                    istate.pos.x = ev->value;
+                    break;
+                case ABS_Y:
+                case ABS_MT_POSITION_Y:
+                    istate.pos.y = ev->value;
+                    break;
+                case ABS_MT_TRACKING_ID:
+                    // NOTE: For sunxi pen mode shenanigans
+                    break;
+                default:
+                    break;
+            }
         }
+
+        return false;
     }
 
     void handle_evdev(Buffers & buffers, int fd) {
         struct input_event ev;
         ssize_t size = read(fd, &ev, sizeof(struct input_event));
-        if (size < 0 || static_cast<size_t>(size) < sizeof(struct input_event)) {
-            printf("error reading from fd %d\n", fd);
-            return;
+        // Drain the full input frame in one go
+        while (size == sizeof(struct input_event)) {
+            handle_evdev(buffers, &ev);
+            size = read(fd, &ev, sizeof(struct input_event));
         }
-        handle_evdev(buffers, ev);
     }
 
     void handle_serial(Buffers & buffers, int fd) {
