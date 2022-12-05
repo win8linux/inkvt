@@ -59,6 +59,7 @@ const kbkey * osk_press(unsigned int width, unsigned int height, unsigned int x,
     //        as all the keys in the same row will have the same y coords,
     //        and all the keys in the same column will have the same x coords.
     //        (Just make sure keys that span multiple columns (e.g., space) belong to all of them).
+    // NOTE:  Errm, this doesn't quite work given how our keys are laid out (not really aligned). Oh, well :D.
     for (unsigned int i = 0u; i < OSK_NKEYS; i++) {
         unsigned int kx = static_cast<unsigned int>(osk_keys[i].x * static_cast<float>(blockw));
         unsigned int ky = static_cast<unsigned int>(osk_keys[i].y * static_cast<float>(blockh));
