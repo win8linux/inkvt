@@ -1,6 +1,7 @@
 #include "vterm.h"
 #include "../src/vterm_internal.h" // We pull in some internal bits too
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -78,6 +79,26 @@ static void print_color(const VTermColor *col)
     printf(",is_default_bg");
   }
   printf(")");
+}
+
+static VTermColor strpe_color(char **strp)
+{
+  uint8_t r, g, b, idx;
+  int len = 0;
+  VTermColor col;
+
+  if(sscanf(*strp, "rgb(%hhu,%hhu,%hhu)%n", &r, &g, &b, &len) == 3 && len > 0) {
+    *strp += len;
+    vterm_color_rgb(&col, r, g, b);
+  }
+  else if(sscanf(*strp, "idx(%hhu)%n", &idx, &len) == 1 && len > 0) {
+    *strp += len;
+    vterm_color_indexed(&col, idx);
+  }
+  else
+    vterm_color_rgb(&col, 127, 127, 127);
+
+  return col;
 }
 
 static VTerm *vt;
@@ -399,6 +420,8 @@ static struct {
   int conceal;
   int strike;
   int font;
+  int small;
+  int baseline;
   VTermColor foreground;
   VTermColor background;
 } state_pen;
@@ -429,6 +452,12 @@ static int state_setpenattr(VTermAttr attr, VTermValue *val, void *user)
   case VTERM_ATTR_FONT:
     state_pen.font = val->number;
     break;
+  case VTERM_ATTR_SMALL:
+    state_pen.small = val->boolean;
+    break;
+  case VTERM_ATTR_BASELINE:
+    state_pen.baseline = val->number;
+    break;
   case VTERM_ATTR_FOREGROUND:
     state_pen.foreground = val->color;
     break;
@@ -448,6 +477,15 @@ static int state_setlineinfo(int row, const VTermLineInfo *newinfo, const VTermL
   return 1;
 }
 
+static int want_state_scrollback = 0;
+static int state_sb_clear(void *user) {
+  if(!want_state_scrollback)
+    return 1;
+
+  printf("sb_clear\n");
+  return 0;
+}
+
 VTermStateCallbacks state_cbs = {
   .putglyph    = state_putglyph,
   .movecursor  = movecursor,
@@ -457,6 +495,7 @@ VTermStateCallbacks state_cbs = {
   .setpenattr  = state_setpenattr,
   .settermprop = settermprop,
   .setlineinfo = state_setlineinfo,
+  .sb_clear    = state_sb_clear,
 };
 
 static int selection_set(VTermSelectionMask mask, VTermStringFragment frag, void *user)
@@ -566,6 +605,15 @@ static int screen_sb_popline(int cols, VTermScreenCell *cells, void *user)
   return 1;
 }
 
+static int screen_sb_clear(void *user)
+{
+  if(!want_screen_scrollback)
+    return 1;
+
+  printf("sb_clear\n");
+  return 0;
+}
+
 VTermScreenCallbacks screen_cbs = {
   .damage      = screen_damage,
   .moverect    = moverect,
@@ -573,6 +621,7 @@ VTermScreenCallbacks screen_cbs = {
   .settermprop = settermprop,
   .sb_pushline = screen_sb_pushline,
   .sb_popline  = screen_sb_popline,
+  .sb_clear    = screen_sb_clear,
 };
 
 int main(int argc, char **argv)
@@ -599,10 +648,12 @@ int main(int argc, char **argv)
     }
 
     else if(streq(line, "WANTPARSER")) {
+      assert(vt);
       vterm_parser_set_callbacks(vt, &parser_cbs, NULL);
     }
 
     else if(strstartswith(line, "WANTSTATE") && (line[9] == '\0' || line[9] == ' ')) {
+      assert(vt);
       if(!state) {
         state = vterm_obtain_state(vt);
         vterm_state_set_callbacks(state, &state_cbs, NULL);
@@ -641,12 +692,16 @@ int main(int argc, char **argv)
         case 'f':
           vterm_state_set_unrecognised_fallbacks(state, sense ? &fallbacks : NULL, NULL);
           break;
+        case 'b':
+          want_state_scrollback = sense;
+          break;
         default:
           fprintf(stderr, "Unrecognised WANTSTATE flag '%c'\n", line[i]);
         }
     }
 
     else if(strstartswith(line, "WANTSCREEN") && (line[10] == '\0' || line[10] == ' ')) {
+      assert(vt);
       if(!screen)
         screen = vterm_obtain_screen(vt);
       vterm_screen_set_callbacks(screen, &screen_cbs, NULL);
@@ -682,6 +737,9 @@ int main(int argc, char **argv)
         case 'b':
           want_screen_scrollback = sense;
           break;
+        case 'r':
+          vterm_screen_enable_reflow(screen, sense);
+          break;
         default:
           fprintf(stderr, "Unrecognised WANTSCREEN flag '%c'\n", line[i]);
         }
@@ -713,6 +771,8 @@ int main(int argc, char **argv)
     else if(strstartswith(line, "PUSH ")) {
       char *bytes = line + 5;
       size_t len = inplace_hex2bytes(bytes);
+      assert(len);
+
       size_t written = vterm_input_write(vt, bytes, len);
       if(written < len)
         fprintf(stderr, "! short write\n");
@@ -730,6 +790,7 @@ int main(int argc, char **argv)
     else if(strstartswith(line, "ENCIN ")) {
       char *bytes = line + 6;
       size_t len = inplace_hex2bytes(bytes);
+      assert(len);
 
       uint32_t cp[len];
       int cpi = 0;
@@ -781,6 +842,7 @@ int main(int argc, char **argv)
     }
 
     else if(strstartswith(line, "FOCUS ")) {
+      assert(state);
       char *linep = line + 6;
       if(streq(linep, "IN"))
         vterm_state_focus_in(state);
@@ -818,6 +880,7 @@ int main(int argc, char **argv)
     }
 
     else if(strstartswith(line, "SELECTION ")) {
+      assert(state);
       char *linep = line + 10;
       unsigned int mask;
       int len;
@@ -834,6 +897,8 @@ int main(int argc, char **argv)
       }
       frag.len = inplace_hex2bytes(linep);
       frag.str = linep;
+      assert(frag.len);
+
       linep += frag.len * 2;
       while(linep[0] == ' ')
         linep++;
@@ -844,6 +909,7 @@ int main(int argc, char **argv)
     }
 
     else if(strstartswith(line, "DAMAGEMERGE ")) {
+      assert(screen);
       char *linep = line + 12;
       while(linep[0] == ' ')
         linep++;
@@ -858,11 +924,30 @@ int main(int argc, char **argv)
     }
 
     else if(strstartswith(line, "DAMAGEFLUSH")) {
+      assert(screen);
       vterm_screen_flush_damage(screen);
+    }
+
+    else if(strstartswith(line, "SETDEFAULTCOL ")) {
+      assert(screen);
+      char *linep = line + 14;
+      while(linep[0] == ' ')
+        linep++;
+      VTermColor fg = strpe_color(&linep);
+      if(linep[0]) {
+        while(linep[0] == ' ')
+          linep++;
+        VTermColor bg = strpe_color(&linep);
+
+        vterm_screen_set_default_colors(screen, &fg, &bg);
+      }
+      else
+        vterm_screen_set_default_colors(screen, &fg, NULL);
     }
 
     else if(line[0] == '?') {
       if(streq(line, "?cursor")) {
+        assert(state);
         VTermPos pos;
         vterm_state_get_cursorpos(state, &pos);
         if(pos.row != state_pos.row)
@@ -875,6 +960,7 @@ int main(int argc, char **argv)
           printf("%d,%d\n", state_pos.row, state_pos.col);
       }
       else if(strstartswith(line, "?pen ")) {
+        assert(state);
         char *linep = line + 5;
         while(linep[0] == ' ')
           linep++;
@@ -930,6 +1016,24 @@ int main(int argc, char **argv)
           else
             printf("%d\n", state_pen.font);
         }
+        else if(streq(linep, "small")) {
+          vterm_state_get_penattr(state, VTERM_ATTR_SMALL, &val);
+          if(val.boolean != state_pen.small)
+            printf("! pen small mismatch; state=%s, event=%s\n",
+                BOOLSTR(val.boolean), BOOLSTR(state_pen.small));
+          else
+            printf("%s\n", BOOLSTR(state_pen.small));
+        }
+        else if(streq(linep, "baseline")) {
+          vterm_state_get_penattr(state, VTERM_ATTR_BASELINE, &val);
+          if(val.number != state_pen.baseline)
+            printf("! pen baseline mismatch: state=%d, event=%d\n",
+                val.number, state_pen.baseline);
+          else
+            printf("%s\n", state_pen.baseline == VTERM_BASELINE_RAISE ? "raise"
+                         : state_pen.baseline == VTERM_BASELINE_LOWER ? "lower"
+                         : "normal");
+        }
         else if(streq(linep, "foreground")) {
           print_color(&state_pen.foreground);
           printf("\n");
@@ -942,6 +1046,7 @@ int main(int argc, char **argv)
           printf("?\n");
       }
       else if(strstartswith(line, "?lineinfo ")) {
+        assert(state);
         char *linep = line + 10;
         int row;
         const VTermLineInfo *info;
@@ -961,12 +1066,20 @@ int main(int argc, char **argv)
         printf("\n");
       }
       else if(strstartswith(line, "?screen_chars ")) {
+        assert(screen);
         char *linep = line + 13;
         VTermRect rect;
         size_t len;
         while(linep[0] == ' ')
           linep++;
-        if(sscanf(linep, "%d,%d,%d,%d", &rect.start_row, &rect.start_col, &rect.end_row, &rect.end_col) < 4) {
+        if(sscanf(linep, "%d,%d,%d,%d", &rect.start_row, &rect.start_col, &rect.end_row, &rect.end_col) == 4)
+          ; // fine
+        else if(sscanf(linep, "%d", &rect.start_row) == 1) {
+          rect.end_row = rect.start_row + 1;
+          rect.start_col = 0;
+          vterm_get_size(vt, NULL, &rect.end_col);
+        }
+        else {
           printf("! screen_chars unrecognised input\n");
           goto abort_line;
         }
@@ -985,6 +1098,7 @@ int main(int argc, char **argv)
         }
       }
       else if(strstartswith(line, "?screen_text ")) {
+        assert(screen);
         char *linep = line + 12;
         VTermRect rect;
         size_t len;
@@ -1021,6 +1135,7 @@ int main(int argc, char **argv)
         }
       }
       else if(strstartswith(line, "?screen_cell ")) {
+        assert(screen);
         char *linep = line + 12;
         VTermPos pos;
         while(linep[0] == ' ')
@@ -1043,6 +1158,10 @@ int main(int argc, char **argv)
         if(cell.attrs.blink)     printf("K");
         if(cell.attrs.reverse)   printf("R");
         if(cell.attrs.font)      printf("F%d", cell.attrs.font);
+        if(cell.attrs.small)     printf("S");
+        if(cell.attrs.baseline)  printf(
+            cell.attrs.baseline == VTERM_BASELINE_RAISE ? "^" :
+                                                          "_");
         printf("} ");
         if(cell.attrs.dwl)       printf("dwl ");
         if(cell.attrs.dhl)       printf("dhl-%s ", cell.attrs.dhl == 2 ? "bottom" : "top");
@@ -1055,6 +1174,7 @@ int main(int argc, char **argv)
         printf("\n");
       }
       else if(strstartswith(line, "?screen_eol ")) {
+        assert(screen);
         char *linep = line + 12;
         while(linep[0] == ' ')
           linep++;
@@ -1066,6 +1186,7 @@ int main(int argc, char **argv)
         printf("%d\n", vterm_screen_is_eol(screen, pos));
       }
       else if(strstartswith(line, "?screen_attrs_extent ")) {
+        assert(screen);
         char *linep = line + 21;
         while(linep[0] == ' ')
           linep++;

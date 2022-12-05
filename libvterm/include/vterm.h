@@ -12,7 +12,7 @@ extern "C" {
 #include "vterm_keycodes.h"
 
 #define VTERM_VERSION_MAJOR 0
-#define VTERM_VERSION_MINOR 2
+#define VTERM_VERSION_MINOR 3
 
 #define VTERM_CHECK_VERSION \
         vterm_check_version(VTERM_VERSION_MAJOR, VTERM_VERSION_MINOR)
@@ -242,6 +242,8 @@ typedef enum {
   VTERM_ATTR_FONT,       // number: 10-19
   VTERM_ATTR_FOREGROUND, // color:  30-39 90-97
   VTERM_ATTR_BACKGROUND, // color:  40-49 100-107
+  VTERM_ATTR_SMALL,      // bool:   73, 74, 75
+  VTERM_ATTR_BASELINE,   // number: 73, 74, 75
 
   VTERM_N_ATTRS
 } VTermAttr;
@@ -427,6 +429,7 @@ typedef struct {
   int (*bell)(void *user);
   int (*resize)(int rows, int cols, VTermStateFields *fields, void *user);
   int (*setlineinfo)(int row, const VTermLineInfo *newinfo, const VTermLineInfo *oldinfo, void *user);
+  int (*sb_clear)(void *user);
 } VTermStateCallbacks;
 
 typedef struct {
@@ -497,6 +500,8 @@ typedef struct {
     unsigned int font      : 4; /* 0 to 9 */
     unsigned int dwl       : 1; /* On a DECDWL or DECDHL line */
     unsigned int dhl       : 2; /* On a DECDHL line (1=top 2=bottom) */
+    unsigned int small     : 1;
+    unsigned int baseline  : 2;
 } VTermScreenCellAttrs;
 
 enum {
@@ -504,6 +509,12 @@ enum {
   VTERM_UNDERLINE_SINGLE,
   VTERM_UNDERLINE_DOUBLE,
   VTERM_UNDERLINE_CURLY,
+};
+
+enum {
+  VTERM_BASELINE_NORMAL,
+  VTERM_BASELINE_RAISE,
+  VTERM_BASELINE_LOWER,
 };
 
 typedef struct {
@@ -522,6 +533,7 @@ typedef struct {
   int (*resize)(int rows, int cols, void *user);
   int (*sb_pushline)(int cols, const VTermScreenCell *cells, void *user);
   int (*sb_popline)(int cols, VTermScreenCell *cells, void *user);
+  int (*sb_clear)(void* user);
 } VTermScreenCallbacks;
 
 VTermScreen *vterm_obtain_screen(VTerm *vt);
@@ -531,6 +543,11 @@ void *vterm_screen_get_cbdata(VTermScreen *screen);
 
 void  vterm_screen_set_unrecognised_fallbacks(VTermScreen *screen, const VTermStateFallbacks *fallbacks, void *user);
 void *vterm_screen_get_unrecognised_fbdata(VTermScreen *screen);
+
+void vterm_screen_enable_reflow(VTermScreen *screen, bool reflow);
+
+// Back-compat alias for the brief time it was in 0.3-RC1
+#define vterm_screen_set_reflow  vterm_screen_enable_reflow
 
 void vterm_screen_enable_altscreen(VTermScreen *screen, int altscreen);
 
@@ -563,8 +580,10 @@ typedef enum {
   VTERM_ATTR_FOREGROUND_MASK = 1 << 7,
   VTERM_ATTR_BACKGROUND_MASK = 1 << 8,
   VTERM_ATTR_CONCEAL_MASK    = 1 << 9,
+  VTERM_ATTR_SMALL_MASK      = 1 << 10,
+  VTERM_ATTR_BASELINE_MASK   = 1 << 11,
 
-  VTERM_ALL_ATTRS_MASK = (1 << 10) - 1
+  VTERM_ALL_ATTRS_MASK = (1 << 12) - 1
 } VTermAttrMask;
 
 int vterm_screen_get_attrs_extent(const VTermScreen *screen, VTermRect *extent, VTermPos pos, VTermAttrMask attrs);
@@ -578,6 +597,12 @@ int vterm_screen_is_eol(const VTermScreen *screen, VTermPos pos);
  * instance.
  */
 void vterm_screen_convert_color_to_rgb(const VTermScreen *screen, VTermColor *col);
+
+/**
+ * Similar to vterm_state_set_default_colors(), but also resets colours in the
+ * screen buffer(s)
+ */
+void vterm_screen_set_default_colors(VTermScreen *screen, const VTermColor *default_fg, const VTermColor *default_bg);
 
 // ---------
 // Utilities

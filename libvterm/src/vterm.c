@@ -113,6 +113,9 @@ void vterm_get_size(const VTerm *vt, int *rowsp, int *colsp)
 
 void vterm_set_size(VTerm *vt, int rows, int cols)
 {
+  if(rows < 1 || cols < 1)
+    return;
+
   vt->rows = rows;
   vt->cols = cols;
 
@@ -271,6 +274,8 @@ VTermValueType vterm_get_attr_type(VTermAttr attr)
     case VTERM_ATTR_FONT:       return VTERM_VALUETYPE_INT;
     case VTERM_ATTR_FOREGROUND: return VTERM_VALUETYPE_COLOR;
     case VTERM_ATTR_BACKGROUND: return VTERM_VALUETYPE_COLOR;
+    case VTERM_ATTR_SMALL:      return VTERM_VALUETYPE_BOOL;
+    case VTERM_ATTR_BASELINE:   return VTERM_VALUETYPE_INT;
 
     case VTERM_N_ATTRS: return 0;
   }
