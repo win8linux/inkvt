@@ -43,6 +43,10 @@
 static int _is_event_device(const struct dirent *dir) {
     return strncmp("event", dir->d_name, 5) == 0;
 }
+#else
+#define NXP_TOUCHPAD_EVDEV        "/dev/input/event1"
+#define ELAN_BUS0_TOUCHPAD_EVDEV  "/dev/input/by-path/platform-0-0010-event"
+#define ELAN_BUS1_TOUCHPAD_EVDEV  "/dev/input/by-path/platform-1-0010-event"
 #endif
 
 class Inputs {
@@ -285,8 +289,15 @@ public:
 
     void add_evdev() {
 #ifdef TARGET_KOBO
-        // Touch input is always event1 on Kobo, and we *definitely* don't want to pickup the gyro if there's one...
-        int fd = open("/dev/input/event1", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        // Touch input is not always event1...
+        int fd;
+        if (access(ELAN_BUS1_TOUCHPAD_EVDEV, F_OK) == 0) {
+            fd = open(ELAN_BUS1_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        } else if (access(ELAN_BUS1_TOUCHPAD_EVDEV, F_OK) == 0) {
+            fd = open(ELAN_BUS1_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        } else {
+            fd = open(NXP_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        }
         if (fd == -1) {
             printf("couldn't open `/dev/input/event1` %d\n", fd);
             return;
