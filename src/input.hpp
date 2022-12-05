@@ -178,11 +178,13 @@ private:
 
     void handle_evdev(Buffers & buffers, int fd) {
         struct input_event ev;
-        ssize_t size = read(fd, &ev, sizeof(struct input_event));
         // Drain the full input frame in one go
-        while (size == sizeof(struct input_event)) {
+        for (;;) {
+            ssize_t nread = read(fd, &ev, sizeof(struct input_event));
+            if (nread != sizeof(struct input_event)) {
+                break;
+            }
             handle_evdev(buffers, &ev);
-            size = read(fd, &ev, sizeof(struct input_event));
         }
     }
 
