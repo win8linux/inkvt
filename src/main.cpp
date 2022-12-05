@@ -172,7 +172,8 @@ int main(int argc, char ** argv) {
             }
         }
         if (vterm.has_osk) {
-            if (inputs.istate.state == UP) {
+            if (inputs.istate.state == UP && inputs.istate.moved) {
+                inputs.istate.moved = false;
                 int32_t x;
                 int32_t y;
 #ifdef TARGET_KOBO

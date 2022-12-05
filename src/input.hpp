@@ -61,6 +61,7 @@ public:
         int32_t prev_y = 0;
         contact_tool tool = UNKNOWN_TOOL;
         contact_state state = UNKNOWN_STATE;
+        bool moved = false;
     } istate;
 private:
     enum fdtype {
@@ -103,6 +104,7 @@ private:
                 touch->pos.y < prev_touch->pos.y - 2)) {
                     istate.prev_x = istate.x;
                     istate.prev_y = istate.y;
+                    istate.moved = true;
             }
 
             // Keep draining the queue without going back to poll
@@ -261,7 +263,9 @@ public:
     void wait(Buffers & buffers) {
         poll(fds, nfds, -1);
         for (int i = 0; i < nfds; i++) {
-            if (!fds[i].revents) continue;
+            if (!fds[i].revents) {
+                continue;
+            }
             if (fdtype[i] == FD_EVDEV) {
                 handle_evdev(buffers, fds[i].fd);
             } else if (fdtype[i] == FD_SERIAL) {
