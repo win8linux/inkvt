@@ -1,14 +1,13 @@
 GITHASH='"'$(shell git rev-parse --short HEAD)'"'
 
-CROSS_TC?=/home/llandsmeer/Build/gcc-linaro-7.5.0-2019.12-i686_arm-linux-gnueabihf/bin/arm-linux-gnueabihf
-# CROSS_TC?=arm-linux-gnueabihf
+CROSS_TC?=arm-kobo-linux-gnueabihf
 
 ifdef DEBUG
 	CFLAGS   += -g -fno-omit-frame-pointer -pg
 	CXXFLAGS += -g -fno-omit-frame-pointer -pg
 else
-	CFLAGS   ?= -O2
-	CXXFLAGS ?= -O2
+	CFLAGS   ?= -Ofast
+	CXXFLAGS ?= -Ofast
 endif
 
 CPPFLAGS += -Ilibvterm/include -DGITHASH=$(GITHASH)
