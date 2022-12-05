@@ -299,10 +299,10 @@ public:
             fd = open(NXP_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         }
         if (fd == -1) {
-            printf("couldn't open `/dev/input/event1` %d\n", fd);
+            printf("couldn't open touch input device: %m\n");
             return;
         }
-        printf("opened `/dev/input/event1`\n");
+        printf("opened touch input device\n");
         fdtype[nfds] = FD_EVDEV;
         fds[nfds].events = POLLIN;
         fds[nfds++].fd = fd;
