@@ -108,14 +108,6 @@ if [ -e crash.log ]; then
     mv -f crash.log.new crash.log
 fi
 
-# Skip this if WiFi appears to already be up
-# (Interface symlink doesn't exist if the WiFi modules are unloaded, and carrier is only set to 1 if network's up).
-if [ ! -e "/sys/class/net/${INTERFACE}/carrier" ] || [ "$(cat /sys/class/net/${INTERFACE}/carrier)" -ne 1 ]; then
-    ${FBINK_BIN} -qMmp "Enabling WiFi . . ."
-    sh ./enable-wifi.sh
-    sleep 10
-fi
-
 echo "Switching fb bitdepth to 8bpp & rotation to Portrait" >>crash.log 2>&1
 ./fbdepth -d 8 -r -1 >>crash.log 2>&1
 
