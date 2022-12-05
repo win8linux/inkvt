@@ -55,6 +55,10 @@ void osk_render(int fd, FBInkConfig * config, unsigned int osk_y, unsigned int w
 const kbkey * osk_press(unsigned int width, unsigned int height, unsigned int x, unsigned int y) {
     unsigned int blockw = width / OSK_W;
     unsigned int blockh = height / OSK_H;
+    // FIXME: Group keys in rows and columns, to avoid having to go through every key,
+    //        as all the keys in the same row will have the same y coords,
+    //        and all the keys in the same column will have the same x coords.
+    //        (Just make sure keys that span multiple columns (e.g., space) belong to all of them).
     for (unsigned int i = 0u; i < OSK_NKEYS; i++) {
         unsigned int kx = static_cast<unsigned int>(osk_keys[i].x * static_cast<float>(blockw));
         unsigned int ky = static_cast<unsigned int>(osk_keys[i].y * static_cast<float>(blockh));
