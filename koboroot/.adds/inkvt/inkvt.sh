@@ -111,12 +111,6 @@ fi
 echo "Switching fb bitdepth to 8bpp & rotation to Portrait" >>crash.log 2>&1
 ./fbdepth -d 8 -r -1 >>crash.log 2>&1
 
-# If there aren't any DNS servers listed, append CloudFlare's
-if ! grep -q '^nameserver' "/etc/resolv.conf"; then
-    echo "# Added by InkVT because your setup is broken" >>"/etc/resolv.conf"
-    echo "nameserver 1.1.1.1" >>"/etc/resolv.conf"
-fi
-
 # VT100 terminal for E-ink devices
 # Usage:
 #   inkvt [OPTION...]
