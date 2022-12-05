@@ -1,6 +1,6 @@
 #!/bin/sh
 # From https://github.com/koreader/koreader/blob/master/platform/kobo/nickel.sh
-# Copyright (C) 2020 koreader
+# Copyright (C) 2020-2022 KOReader
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
