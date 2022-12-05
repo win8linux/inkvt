@@ -54,6 +54,17 @@ public:
     Server server;
     bool had_input = 0;
 
+    enum contact_tool {
+        UNKNOWN_TOOL,
+        FINGER,
+        PEN,
+    };
+    enum contact_state {
+        UNKNOWN_STATE,
+        DOWN,
+        UP,
+    };
+
     struct {
         int32_t x = 0;
         int32_t y = 0;
@@ -74,16 +85,6 @@ private:
         FD_VTERM_TIMER,
         FD_TIMER_NO_INPUT,
     };
-    enum contact_tool {
-        UNKNOWN_TOOL,
-        FINGER,
-        PEN,
-    };
-    enum contact_state {
-        UNKNOWN_STATE,
-        DOWN,
-        UP,
-    };
     fdtype fdtype[128];
     struct pollfd fds[128];
     int nfds = 0;
@@ -91,17 +92,17 @@ private:
     struct termios termios_reset = {};
     VTermToFBInk * vterm = 0;
 
-    bool handle_evdev(Buffers & buffers, struct input_event & ev) {
+    bool handle_evdev(Buffers & buffers __attribute__((unused)), struct input_event * ev) {
         // NOTE: Lifted from https://github.com/NiLuJe/FBInk/blob/master/utils/finger_trace.c
         // NOTE: Shitty minimal state machinesque: we don't handle slots, gestures, or whatever ;).
         if (ev->type == EV_SYN && ev->code == SYN_REPORT) {
             // We only do stuff on each REPORT,
             // iff the finger actually moved somewhat significantly...
             // NOTE: Should ideally be clamped to between 0 and the relevant screen dimension ;).
-            if ((touch->pos.x > prev_touch->pos.x + 2 ||
-                touch->pos.x < prev_touch->pos.x - 2) ||
-                (touch->pos.y > prev_touch->pos.y + 2 ||
-                touch->pos.y < prev_touch->pos.y - 2)) {
+            if ((istate.x > istate.prev_x + 2 ||
+                istate.x < istate.prev_x - 2) ||
+                (istate.y > istate.prev_y + 2 ||
+                istate.y < istate.prev_y - 2)) {
                     istate.prev_x = istate.x;
                     istate.prev_y = istate.y;
                     istate.moved = true;
@@ -165,11 +166,11 @@ private:
                     break;
                 case ABS_X:
                 case ABS_MT_POSITION_X:
-                    istate.pos.x = ev->value;
+                    istate.x = ev->value;
                     break;
                 case ABS_Y:
                 case ABS_MT_POSITION_Y:
-                    istate.pos.y = ev->value;
+                    istate.y = ev->value;
                     break;
                 case ABS_MT_TRACKING_ID:
                     // NOTE: For sunxi pen mode shenanigans

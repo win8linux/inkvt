@@ -504,7 +504,8 @@ public:
             .bell = VTermToFBInk::term_bell,
             .resize = 0,
             .sb_pushline = 0,
-            .sb_popline = 0
+            .sb_popline = 0,
+            .sb_clear = 0
         };
         term = vterm_new(nrows(), ncols());
         vterm_set_utf8(term, 1);
