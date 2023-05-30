@@ -298,8 +298,8 @@ public:
         int fd;
         if (access(ELAN_BUS1_TOUCHPAD_EVDEV, F_OK) == 0) {
             fd = open(ELAN_BUS1_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-        } else if (access(ELAN_BUS1_TOUCHPAD_EVDEV, F_OK) == 0) {
-            fd = open(ELAN_BUS1_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        } else if (access(ELAN_BUS0_TOUCHPAD_EVDEV, F_OK) == 0) {
+            fd = open(ELAN_BUS0_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         } else {
             fd = open(NXP_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
         }
