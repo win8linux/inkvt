@@ -117,22 +117,29 @@ private:
             switch (ev->code) {
                 case BTN_TOOL_PEN:
                     istate.tool = PEN;
-                    // To detect up/down state on "snow" protocol without weird slot shenanigans...
-                    // It's out-of-band of MT events, so, it unfortunately means *all* contacts,
-                    // not a specific slot...
-                    // (i.e., you won't get an EV_KEY:BTN_TOUCH:0 until *all* contact points have been lifted).
                     if (ev->value > 0) {
-                            istate.state = DOWN;
+                        istate.state = DOWN;
                     } else {
-                            istate.state = UP;
+                        istate.state = UP;
                     }
                     break;
                 case BTN_TOOL_FINGER:
                     istate.tool = FINGER;
                     if (ev->value > 0) {
-                            istate.state = DOWN;
+                        istate.state = DOWN;
                     } else {
-                            istate.state = UP;
+                        istate.state = UP;
+                    }
+                    break;
+                case BTN_TOUCH:
+                    // To detect up/down state on "snow" protocol without weird slot shenanigans...
+                    // It's out-of-band of MT events, so, it unfortunately means *all* contacts,
+                    // not a specific slot...
+                    // (i.e., you won't get an EV_KEY:BTN_TOUCH:0 until *all* contact points have been lifted).
+                    if (ev->value > 0) {
+                        istate.state = DOWN;
+                    } else {
+                        istate.state = UP;
                     }
                     break;
             }
@@ -143,9 +150,9 @@ private:
                 case ABS_MT_TOOL_TYPE:
                     // Detect tool type on Mk. 8
                     if (ev->value == 0) {
-                            istate.tool = FINGER;
+                        istate.tool = FINGER;
                     } else if (ev->value == 1) {
-                            istate.tool = PEN;
+                        istate.tool = PEN;
                     }
                     break;
                 // NOTE: That should cover everything...
@@ -159,9 +166,9 @@ private:
                 //case ABS_MT_TOUCH_MAJOR: // Oops, not that one, it's always 0 on early Mk.7 devices :s
                 case ABS_MT_PRESSURE:
                     if (ev->value > 0) {
-                            istate.state = DOWN;
+                        istate.state = DOWN;
                     } else {
-                            istate.state = UP;
+                        istate.state = UP;
                     }
                     break;
                 case ABS_X:
@@ -173,7 +180,10 @@ private:
                     istate.y = ev->value;
                     break;
                 case ABS_MT_TRACKING_ID:
-                    // NOTE: For sunxi pen mode shenanigans
+                    if (ev->value == -1) {
+                        istate.state = UP;
+                    }
+                    // NOTE: Could also be used for sunxi pen mode shenanigans
                     break;
                 default:
                     break;
