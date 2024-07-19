@@ -79,7 +79,7 @@ endif
 kobo: build/fbdepth build/libfbink_kobo.a build/libvterm_kobo.a src/_kbsend.hpp
 	python3 keymap.py > src/_keymap.hpp
 	python3 src/kblayout.py > src/_kblayout.hpp
-	$(CROSS_TC)-g++ -DTARGET_KOBO $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_WARNINGS) src/main.cpp -lvterm_kobo -lfbink_kobo -li2c -o build/inkvt.armhf $(LDFLAGS) $(STATIC_STL_FLAG)
+	$(CROSS_TC)-g++ -DTARGET_KOBO $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_WARNINGS) src/main.cpp -lvterm_kobo -lfbink_kobo -o build/inkvt.armhf $(LDFLAGS) $(STATIC_STL_FLAG)
 ifndef DEBUG
 	$(CROSS_TC)-strip --strip-unneeded build/inkvt.armhf
 	upx build/inkvt.armhf || echo "install UPX for smaller executables"
@@ -122,7 +122,6 @@ ifdef DEBUG
 else
 	cp FBInk/Release/libfbink.a build/libfbink_kobo.a
 endif
-	cp FBInk/libi2c-staged/lib/libi2c.a build/libi2c.a
 
 build/fbdepth:
 	mkdir -p build
