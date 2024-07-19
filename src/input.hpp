@@ -294,40 +294,23 @@ public:
 
     void add_evdev() {
 #ifdef TARGET_KOBO
+        INPUT_DEVICE_TYPE_T match = INPUT_TOUCHSCREEN;
+#else
+        INPUT_DEVICE_TYPE_T match = INPUT_KEYBOARD;
+#endif
         size_t dev_count;
-        FBInkInputDevice* devices = fbink_input_scan(INPUT_TOUCHSCREEN, 0U, 0U, &dev_count);
+        FBInkInputDevice* devices = fbink_input_scan(match, 0U, 0U, &dev_count);
         if (devices) {
             for (FBInkInputDevice* device = devices; device < devices + dev_count; device++) {
                 if (device->matched) {
                     fdtype[nfds] = FD_EVDEV;
                     fds[nfds].events = POLLIN;
                     fds[nfds++].fd = device->fd;
-                    printf("Opened touch input device `%s` @ `%s`\n", device->name, device->path);
+                    printf("Opened input device `%s` @ `%s`\n", device->name, device->path);
                 }
             }
             free(devices);
         }
-#else
-        struct dirent **namelist;
-        int ndev = scandir("/dev/input", &namelist, &_is_event_device, alphasort);
-        for (int i = 0; i < ndev; i++) {
-            char fname[512];
-            snprintf(fname, sizeof(fname), "/dev/input/%s", namelist[i]->d_name);
-            int fd = open(fname, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-            if (fd == -1) {
-                printf("couldn't open %s %d\n", fname, fd);
-                continue;
-            }
-            if (0 && !ioctl(fd, EVIOCGRAB, (void*)1)) {
-                close(fd);
-                continue;
-            }
-            printf("opened %s\n", fname);
-            fdtype[nfds] = FD_EVDEV;
-            fds[nfds].events = POLLIN;
-            fds[nfds++].fd = fd;
-        }
-#endif
     }
 
     void add_progout(int fd) {
