@@ -164,10 +164,10 @@ public:
             y = iy;
         }
         if (mirror_x) {
-            x = state.screen_width - 1 - ix;
+            x = state.screen_width - 1 - x;
         }
         if (mirror_y) {
-            y = state.screen_height - 1 - iy;
+            y = state.screen_height - 1 - y;
         }
         if (debug) {
             printf("translated @ (%d, %d)\n", x, y);
