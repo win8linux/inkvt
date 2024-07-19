@@ -131,7 +131,7 @@ public:
 
 #ifdef TARGET_KOBO
         // The Touch B does something... weird.
-        if (vterm.state.device_id == DEVICE_KOBO_TOUCH_B) {
+        if (state.device_id == DEVICE_KOBO_TOUCH_B) {
             // The frame that reports a contact lift does the panel-specific coordinates transform for us...
             // That means we need to flip it back...
             // NOTE: Since we *only* process such frames, we can get away with doing this globally ;).
