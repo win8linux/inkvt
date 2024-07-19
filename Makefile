@@ -106,7 +106,7 @@ build/libvterm_kobo.a:
 build/libfbink.a:
 	mkdir -p build
 	make -C FBInk clean || (echo "TRY git submodule update --init --recursive"  && false)
-	env -u CROSS_TC -u CPPFLAGS -u CFLAGS -u CXXFLAGS -u LDFLAGS -u AR -u RANLIB make -C FBInk LINUX=true MINIMAL=true FONTS=true IMAGE=true staticlib
+	env -u CROSS_TC -u CPPFLAGS -u CFLAGS -u CXXFLAGS -u LDFLAGS -u AR -u RANLIB make -C FBInk LINUX=true MINIMAL=true FONTS=true IMAGE=true INPUT=true staticlib
 ifdef DEBUG
 	cp FBInk/Debug/libfbink.a build/libfbink.a
 else
@@ -116,7 +116,7 @@ endif
 build/libfbink_kobo.a:
 	mkdir -p build
 	make -C FBInk clean
-	make -C FBInk CROSS_TC=$(CROSS_TC) KOBO=true MINIMAL=true FONTS=true IMAGE=true staticlib
+	make -C FBInk CROSS_TC=$(CROSS_TC) KOBO=true MINIMAL=true FONTS=true IMAGE=true INPUT=true staticlib
 ifdef DEBUG
 	cp FBInk/Debug/libfbink.a build/libfbink_kobo.a
 else
