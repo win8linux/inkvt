@@ -174,53 +174,24 @@ int main(int argc, char ** argv) {
         if (vterm.has_osk) {
             if (inputs.istate.state == Inputs::contact_state::UP && inputs.istate.moved) {
                 inputs.istate.moved = false;
-                int32_t x;
-                int32_t y;
+                // We'll need a copy of our precomputed rotation + panel coordinates transforms...
+                // (If it weren't for the Touch B quirk below, we wouldn't need a copy at all :/).
+                bool       swap_axes = vterm.input_quirks.swap_axes;
+                bool       mirror_x  = vterm.input_quirks.mirror_x;
+                const bool mirror_y  = vterm.input_quirks.mirror_y;
 #ifdef TARGET_KOBO
-                // On Kobo, the touch panel has a fixed rotation, one that *never* matches the actual rotation.
-                // Handle the initial translation here so that it makes sense @ (canonical) UR...
-                // (This is generally a -90°/+90°, made trickier because there's a layout swap so height/width are swapped).
-                // c.f., rotate_touch_coordinates in FBInk for a different, possibly less compatible approach...
-
-                // Speaking of, handle said layout shenanigans now...
-                int32_t dim_swap;
-                if ((fbink_rota_native_to_canonical(vterm.state.current_rota) & 1u) == 0u) {
-                    // Canonical rotation is even (UR/UD)
-                    dim_swap = vterm.state.screen_width;
-                } else {
-                    // Canonical rotation is odd (CW/CCW)
-                    dim_swap = vterm.state.screen_height;
-                }
-
-                // And the various extra device-specific quirks on top of that...
-                // c.f., https://github.com/koreader/koreader/blob/master/frontend/device/kobo/device.lua
+                // The Touch B does something... weird.
                 if (vterm.state.device_id == DEVICE_KOBO_TOUCH_B) {
-                    // The Touch B does something... weird.
-                    // The frame that reports a contact lift does the coordinates transform for us...
-                    // That makes this a NOP for this frame only...
-                    x = inputs.istate.x;
-                    y = inputs.istate.y;
-                } else if (vterm.state.device_id == DEVICE_KOBO_AURA_H2O_2 || vterm.state.device_id == DEVICE_KOBO_LIBRA_2) {
-                    // Aura H2O²r1 & Libra 2
-                    // touch_switch_xy
-                    x = inputs.istate.y;
-                    y = inputs.istate.x;
-                } else {
-                    // touch_switch_xy && touch_mirrored_x
-                    x = dim_swap - inputs.istate.y;
-                    y = inputs.istate.x;
-                }
-                if (debug) {
-                    printf("input touch @ (%d, %d) -> (%d, %d)\n", inputs.istate.x, inputs.istate.y, x, y);
-                }
-#else
-                x = inputs.istate.x;
-                y = inputs.istate.y;
-                if (debug) {
-                    printf("input touch @ (%d, %d)\n", x, y);
+                    // The frame that reports a contact lift does the panel-specific coordinates transform for us...
+                    // That means we need to flip it back...
+                    swap_axes = !swap_axes;
+                    mirror_x  = !mirror_x;
                 }
 #endif
-                const char * kb = vterm.click(x, y, debug);
+                if (debug) {
+                    printf("input touch @ (%d, %d)\n", inputs.istate.x, inputs.istate.y);
+                }
+                const char * kb = vterm.click(inputs.istate.x, inputs.istate.y, swap_axes, mirror_x, mirror_y, debug);
                 for (size_t i = 0u; i < strlen(kb); i++) {
                     buffers.keyboard.push_back(kb[i]);
                 }

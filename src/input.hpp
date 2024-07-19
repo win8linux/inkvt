@@ -39,16 +39,6 @@
 #include "insecure_http.hpp"
 #include "vterm.hpp"
 
-#ifndef TARGET_KOBO
-static int _is_event_device(const struct dirent *dir) {
-    return strncmp("event", dir->d_name, 5) == 0;
-}
-#else
-#define NXP_TOUCHPAD_EVDEV        "/dev/input/event1"
-#define ELAN_BUS0_TOUCHPAD_EVDEV  "/dev/input/by-path/platform-0-0010-event"
-#define ELAN_BUS1_TOUCHPAD_EVDEV  "/dev/input/by-path/platform-1-0010-event"
-#endif
-
 class Inputs {
 public:
     Server server;
@@ -304,23 +294,19 @@ public:
 
     void add_evdev() {
 #ifdef TARGET_KOBO
-        // Touch input is not always event1...
-        int fd;
-        if (access(ELAN_BUS1_TOUCHPAD_EVDEV, F_OK) == 0) {
-            fd = open(ELAN_BUS1_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-        } else if (access(ELAN_BUS0_TOUCHPAD_EVDEV, F_OK) == 0) {
-            fd = open(ELAN_BUS0_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-        } else {
-            fd = open(NXP_TOUCHPAD_EVDEV, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        size_t dev_count;
+        FBInkInputDevice* devices = fbink_input_scan(INPUT_TOUCHSCREEN, 0U, 0U, &dev_count);
+        if (devices) {
+            for (FBInkInputDevice* device = devices; device < devices + dev_count; device++) {
+                if (device->matched) {
+                    fdtype[nfds] = FD_EVDEV;
+                    fds[nfds].events = POLLIN;
+                    fds[nfds++].fd = device->fd;
+                    printf("Opened touch input device `%s` @ `%s`\n", device->name, device->path);
+                }
+            }
+            free(devices);
         }
-        if (fd == -1) {
-            printf("couldn't open touch input device: %m\n");
-            return;
-        }
-        printf("opened touch input device\n");
-        fdtype[nfds] = FD_EVDEV;
-        fds[nfds].events = POLLIN;
-        fds[nfds++].fd = fd;
 #else
         struct dirent **namelist;
         int ndev = scandir("/dev/input", &namelist, &_is_event_device, alphasort);

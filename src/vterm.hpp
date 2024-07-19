@@ -58,8 +58,8 @@ public:
 
     // osk debounce
     timeval osk_last_kp;
-    int osk_last_x = -100;
-    int osk_last_y = -100;
+    int32_t osk_last_x = -100;
+    int32_t osk_last_y = -100;
 
     itimerspec ts_on;
     itimerspec ts_off = {};
@@ -74,6 +74,12 @@ public:
     // FBInkDump dump = {};
 
     bool has_osk = false;
+    struct {
+        uint8_t canonical_rota = FB_ROTATE_UR;
+        bool swap_axes;
+        bool mirror_x;
+        bool mirror_y;
+    } input_quirks;
 
     unsigned int osk_height() {
         if (!has_osk) return 0u;
@@ -112,39 +118,56 @@ public:
         }
     }
 
-    const char * click(int ix, int iy, bool debug=false) {
-        // Handle touch translation depending on the current rotation.
-        // See the initial matching bit of trickery in main,
-        // and hope that FBInk's fbink_rota_native_to_canonical won't screw the pooch.
-        // The whole thing *may* only make sense on Kobo...
-        int x;
-        int y;
-        // c.f., GestureDetector:adjustGesCoordinate @ https://github.com/koreader/koreader/blob/master/frontend/device/gesturedetector.lua
-#ifdef TARGET_KOBO
-        switch (fbink_rota_native_to_canonical(state.current_rota)) {
-#else
-        switch (state.current_rota) {
-#endif
-            case FB_ROTATE_UR:
-                x = ix;
-                y = iy;
-                break;
+    void refresh_input_quirks() {
+        // We need to know the canonical rotation to deal with coordinates translation (and we refresh this on reinit)...
+        input_quirks.canonical_rota = fbink_rota_native_to_canonical(state.current_rota);
+
+        // Grab the device-specific panel translation quirks: we end up with flags similar to what is used in KOReader,
+        // c.f., https://github.com/koreader/koreader/blob/master/frontend/device/kobo/device.lua
+        // These represent what happens at UR (canonical), so we need fresh ones to adjust for the current rotation below.
+        input_quirks.swap_axes = state.touch_swap_axes;
+        input_quirks.mirror_x = state.touch_mirror_x;
+        input_quirks.mirror_y = state.touch_mirror_y;
+
+        // Then, we can handle standard coordinates translation given the current rotation.
+        // We'll deal with this by flipping the swap/mirror flags,
+        // which will allow us to handle everything at once when processing an input frame.
+        // c.f., set_rotation @ https://github.com/rmkit-dev/rmkit/blob/master/src/rmkit/input/events.cpy
+        switch (input_quirks.canonical_rota) {
             case FB_ROTATE_CW:
-                x = state.screen_width - iy;
-                y = ix;
+                input_quirks.swap_axes = !input_quirks.swap_axes;
+                input_quirks.mirror_y  = !input_quirks.mirror_y;
                 break;
             case FB_ROTATE_UD:
-                x = state.screen_width - ix;
-                y = state.screen_height - iy;
+                input_quirks.mirror_x = !input_quirks.mirror_x;
+                input_quirks.mirror_y = !input_quirks.mirror_y;
                 break;
             case FB_ROTATE_CCW:
-                x = iy;
-                y = state.screen_height - ix;
+                input_quirks.swap_axes = !input_quirks.swap_axes;
+                input_quirks.mirror_x  = !input_quirks.mirror_x;
                 break;
             default:
-                x = -1;
-                y = -1;
+                // NOP
                 break;
+        }
+    }
+
+    const char * click(int32_t ix, int32_t iy, bool swap_axes=false, bool mirror_x=false, bool mirror_y=false, bool debug=false) {
+        // Apply the final coordinates transformation
+        int32_t x;
+        int32_t y;
+        if (swap_axes) {
+            x = iy;
+            y = ix;
+        } else {
+            x = ix;
+            y = iy;
+        }
+        if (mirror_x) {
+            x = state.screen_width - 1 - ix;
+        }
+        if (mirror_y) {
+            y = state.screen_height - 1 - iy;
         }
         if (debug) {
             printf("translated @ (%d, %d)\n", x, y);
@@ -271,6 +294,8 @@ public:
                 /* Update the state to track the new rotation */
                 fbink_get_state(&config, &state);
                 printf("fbink_reinit w/ ROTA_CHANGE\n");
+                /* Recompute input translation */
+                refresh_input_quirks();
                 /* Update the high throughput threshold */
                 high_throughput_threshold = state.max_cols * state.max_rows;
                 /* Clear screen and wait to make sure we get rid of potential broken updates
@@ -479,6 +504,8 @@ public:
         fbink_init(fbfd, &config);
         fbink_cls(fbfd, &config, nullptr, false);
         fbink_get_state(&config, &state);
+        /* Compute input translation */
+        refresh_input_quirks();
         config.is_quiet = true;
         config.is_verbose = false;
         fbink_update_verbosity(&config);
