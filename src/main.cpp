@@ -175,34 +175,20 @@ int main(int argc, char ** argv) {
             if (inputs.istate.state == Inputs::contact_state::UP && inputs.istate.moved) {
                 inputs.istate.moved = false;
 
-                // We'll need a copy of our precomputed rotation + panel coordinates transforms...
-                // (If it weren't for the Touch B quirk below, we wouldn't need a copy at all :/).
-                bool       swap_axes = vterm.input_quirks.swap_axes;
-                bool       mirror_x  = vterm.input_quirks.mirror_x;
-                const bool mirror_y  = vterm.input_quirks.mirror_y;
-#ifdef TARGET_KOBO
-                // The Touch B does something... weird.
-                if (vterm.state.device_id == DEVICE_KOBO_TOUCH_B) {
-                    // The frame that reports a contact lift does the panel-specific coordinates transform for us...
-                    // That means we need to flip it back...
-                    swap_axes = !swap_axes;
-                    mirror_x  = !mirror_x;
-                }
-#endif
                 // Apply the final coordinates transformation
                 int32_t x;
                 int32_t y;
-                if (swap_axes) {
+                if (vterm.input_quirks.swap_axes) {
                     x = inputs.istate.y;
                     y = inputs.istate.x;
                 } else {
                     x = inputs.istate.x;
                     y = inputs.istate.y;
                 }
-                if (mirror_x) {
+                if (vterm.input_quirks.mirror_x) {
                     x = vterm.state.screen_width - 1 - x;
                 }
-                if (mirror_y) {
+                if (vterm.input_quirks.mirror_y) {
                     y = vterm.state.screen_height - 1 - y;
                 }
 
