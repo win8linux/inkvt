@@ -152,26 +152,7 @@ public:
         }
     }
 
-    const char * click(int32_t ix, int32_t iy, bool swap_axes=false, bool mirror_x=false, bool mirror_y=false, bool debug=false) {
-        // Apply the final coordinates transformation
-        int32_t x;
-        int32_t y;
-        if (swap_axes) {
-            x = iy;
-            y = ix;
-        } else {
-            x = ix;
-            y = iy;
-        }
-        if (mirror_x) {
-            x = state.screen_width - 1 - x;
-        }
-        if (mirror_y) {
-            y = state.screen_height - 1 - y;
-        }
-        if (debug) {
-            printf("translated @ (%d, %d)\n", x, y);
-        }
+    const char * click(int32_t x, int32_t y) {
         // (do not) draw ugly cursor
         if (0) {
             short cfg_row = config.row;

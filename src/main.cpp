@@ -174,6 +174,7 @@ int main(int argc, char ** argv) {
         if (vterm.has_osk) {
             if (inputs.istate.state == Inputs::contact_state::UP && inputs.istate.moved) {
                 inputs.istate.moved = false;
+
                 // We'll need a copy of our precomputed rotation + panel coordinates transforms...
                 // (If it weren't for the Touch B quirk below, we wouldn't need a copy at all :/).
                 bool       swap_axes = vterm.input_quirks.swap_axes;
@@ -188,10 +189,27 @@ int main(int argc, char ** argv) {
                     mirror_x  = !mirror_x;
                 }
 #endif
-                if (debug) {
-                    printf("input touch @ (%d, %d)\n", inputs.istate.x, inputs.istate.y);
+                // Apply the final coordinates transformation
+                int32_t x;
+                int32_t y;
+                if (swap_axes) {
+                    x = inputs.istate.y;
+                    y = inputs.istate.x;
+                } else {
+                    x = inputs.istate.x;
+                    y = inputs.istate.y;
                 }
-                const char * kb = vterm.click(inputs.istate.x, inputs.istate.y, swap_axes, mirror_x, mirror_y, debug);
+                if (mirror_x) {
+                    x = vterm.state.screen_width - 1 - x;
+                }
+                if (mirror_y) {
+                    y = vterm.state.screen_height - 1 - y;
+                }
+
+                if (debug) {
+                    printf("input touch @ (%d, %d) => (%d, %d)\n", inputs.istate.x, inputs.istate.y, x, y);
+                }
+                const char * kb = vterm.click(x, y);
                 for (size_t i = 0u; i < strlen(kb); i++) {
                     buffers.keyboard.push_back(kb[i]);
                 }
